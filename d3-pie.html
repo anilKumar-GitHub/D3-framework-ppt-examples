@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+	<script src="js/d3.v4.js"></script>
+	<style>
+		.arc text {
+			font: 10px sans-serif;
+			text-anchor: middle;
+		}
+
+		.arc path {
+			stroke: #fff;
+		}
+
+		.title {
+			fill: teal;
+			font-weight: bold;
+		}
+	</style>
+</head>
+
+<body>
+	<svg id="svg"></svg>
+</body>
+<script>
+	var data = [
+		{ browser: 'Chrome', percent: 72 },
+		{ browser: 'IE/Edge', percent: 28 },
+		{ browser: 'Firefox', percent: 54 },
+		{ browser: 'Safari', percent: 45 },
+		{ browser: 'Opera', percent: 12 }
+	];
+
+	var width = 400, height = 300;
+	var radius = Math.min(width, height) / 2;
+
+	var margin = { left: 50, right: 30, top: 50, bottom: 10 };
+	var svgWidth = width + margin.left + margin.right;
+	var svgHeight = height + margin.top + margin.bottom;
+
+	var svg = d3.select("#svg")
+		.attr('width', svgWidth)
+		.attr('height', svgHeight)
+		.style('background-color', '#FFFFF0')
+		.style('border', '1px solid gray')
+		.append('g')
+		.attr("transform",
+			"translate("
+				+ (width + margin.left) / 2 + ", "
+				+ (height + margin.top) / 2 +
+			")"
+		);
+
+	svg.append("text")
+		.attr("transform", "translate(100,0)")
+		.attr("x", -250)
+		.attr("y", 170)
+		.attr("font-size", "24px")
+		.text("Browser Usage aroung the world.")
+
+	var color = d3.scaleOrdinal(['#4daf4a', '#377eb8', '#ff7f00', '#984ea3', '#e41a1c']);
+
+	// Generate the pie
+	var pie = d3.pie().value(d => d.percent);
+
+	// Generate the arcs
+	var arc = d3.arc().innerRadius(0).outerRadius(radius);
+
+	var label = d3.arc().outerRadius(radius).innerRadius(radius - 80);
+
+	//Generate groups
+	var arcs = svg.selectAll("arc")
+		.data(pie(data))
+		.enter()
+		.append("g")
+		.attr("class", "arc");
+
+	//Draw arc paths
+	arcs.append("path")
+		.attr("fill", (d, i) => color(i))
+		.attr("d", arc);
+
+	arcs.append("text")
+		.attr("transform", d => "translate(" + label.centroid(d) + ")")
+		.text(d => d.data.browser);
+</script>

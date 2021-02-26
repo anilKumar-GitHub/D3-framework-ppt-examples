@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<!-- <script src="https://d3js.org/d3.v4.min.js"></script> -->
+
+<script src="js/d3.v4.js"></script>
+
+<style>
+    .line {
+        stroke: blue;
+        stroke-width: 2;
+        fill: none;
+    }
+</style>
+
+<body>
+    <svg id="svg1"></svg>
+    <br />
+    <br />
+    <br />
+    <svg id="svg2"></svg>
+</body>
+
+<script>
+
+    var dataSet = [35, 90, 45, 22, 70, 90, 55, 40, 80, 130, 120];
+    var width = 500, height = 300;
+    var barWidth = 40, barHieght = 10;
+    var barWidthGap = barWidth + 5;
+    var svgLeftPadding = 5;
+
+    var margin = { left: 50, right: 30, top: 30, bottom: 50 };
+    var svgWidth = width + margin.left + margin.right;
+    var svgHeight = height + margin.top + margin.bottom;
+
+    var svg1 = d3.select("#svg1")
+        .attr('width', svgWidth)
+        .attr('height', svgHeight)
+        .style('background-color', '#FFFFF0')
+        .style('border', '1px solid gray')
+        .append('g')
+        .attr("transform", "translate(" + margin.left + ", " + margin.top + ")");
+
+    // Create scale
+    var x_scale = d3.scaleLinear()
+        .domain([d3.min(dataSet), d3.max(dataSet)])
+        .range([0, width]);
+
+    // Add scales to axis
+    var x_axis = d3.axisBottom().scale(x_scale);
+
+    //Append group and insert axis
+    svg1.append("g")
+        .attr("transform", "translate(0, " + height + ")")
+        .call(x_axis);
+
+    var y_scale = d3.scaleLinear()
+        .domain([0, d3.max(dataSet)])
+        .range([height, 0]);
+
+    var y_axis = d3.axisLeft().scale(y_scale);
+    svg1.append("g").call(y_axis);
+
+    var color = d3.scaleQuantile()
+        .domain([d3.min(dataSet), d3.max(dataSet)])
+        .range(['orange', 'red']);
+
+    var scaledHeight = d3.scaleLinear()
+        .domain([0, d3.max(dataSet)])
+        .range([0, height]);
+
+    var rect = svg1.selectAll("rect");
+    rect.data(dataSet)
+        .enter().append('rect')
+        .attr('width', barWidth)
+        .attr('height', d => scaledHeight(d))
+        .attr('fill', d => color(d))
+        .attr('x', (d, i) => (i + .1) * barWidthGap)
+        .attr('y', d => height - scaledHeight(d));
+
+    //This is the accessor function we talked about above
+    var lineFunction1 = d3.line()
+        .x((d, i) => ((i + .1) * barWidthGap) + 20)
+        .y(d => height - scaledHeight(d));
+
+    //The line SVG Path we draw
+    var lineGraph = svg1.append("path")
+        .attr("d", lineFunction1(dataSet))
+        .attr("class", "line");
+
+    var lineFunction2 = d3.line().curve(d3.curveBasis)
+        .x((d, i) => ((i + .1) * barWidthGap) + 20)
+        .y(d => height - scaledHeight(d));
+    //The line SVG Path we draw
+    /*var lineGraph = svg1.append("path")
+        .attr("d", lineFunction2(dataSet))
+        .attr("class", "line");
+    */
+    var dragHandler = d3.drag()
+        .on("drag", function () {
+            d3.select(this)
+                .attr("x", d3.event.x)
+                .attr("y", d3.event.y);
+        });
+
+    dragHandler(svg1.selectAll("rect"));
+
+</script>

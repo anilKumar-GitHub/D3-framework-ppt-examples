@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .lineStyle {
+    stroke: rgb(245, 118, 86);
+    stroke-width: 1.5;
+    fill: none;
+  }
+</style>
+
+<body>
+  <h3 id="axis-val"></h3>
+</body>
+<!-- Load d3.js -->
+<script src="js/d3.v4.js"></script>
+
+<script>
+
+
+  var width = 1000, height = 500;
+
+  var margin = { left: 50, top: 50, right: 30, bottom: 50 };
+  var svgWidth = width + margin.left + margin.right;
+  var svgHeight = height + margin.top + margin.bottom;
+
+  var timeParse = d3.timeParse("%d-%b-%y");
+
+  // append the svg object to the body of the page
+  var svg = d3.select("body")
+    .append("svg")
+    .attr("width", svgWidth)
+    .attr("height", svgHeight)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  //Read the data
+  d3.csv("http://172.20.10.5:4200/usd-inr.csv", function (data) {
+
+    data.forEach(d => {
+      d.Date = timeParse(d.Date);
+      d.Price = parseFloat(d.Price);
+    });
+
+    data.sort((a, b) => a.Date - b.Date);
+
+    // Add X axis --> it is a date format
+    var xScale = d3.scaleTime()
+      .domain(d3.extent(data, function (d) { return d.Date; }))
+      .range([0, width]);
+
+    var xAxis = svg.append("g")
+      .attr("transform", "translate(0, " + height + ")")
+      .call(d3.axisBottom()
+        .scale(xScale)
+        .tickFormat(d3.timeFormat("%Y Yr"))
+        .ticks(10)
+      );
+
+    // Add Y axis
+    var yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.Price)])
+      .range([height, 0]);
+
+    var yAxis = svg.append("g")
+      .call(d3.axisLeft().scale(yScale));
+
+    var areaFunction = d3.area()
+      .x(d => xScale(d.Date))
+      .y0(yScale(0))
+      .y1(d => yScale(d.Price));
+
+    // Add the area
+    svg.append("path")
+      .datum(data)
+      .attr('class', 'arcClass')
+      .attr("fill", "#cce5df")
+      .attr("stroke", "#69b3a2")
+      .attr("stroke-width", 1)
+      .attr("fill-opacity", .3)
+      .attr("d", areaFunction)
+
+    var lineFunction = d3.line()//.curve(d3.curveBasis)
+      .x(d => xScale(d.Date))
+      .y(d => yScale(d.Price));
+
+    //The line SVG Path we draw
+    var lineGraph = svg.append("path")
+      .datum(data)
+      .attr("d", lineFunction)
+      .attr("class", "lineStyle");
+
+    /* Handling mouse events on SVG */
+    var mouseG = svg.append("g").attr("class", "mouse-over-effects");
+
+    var mouseX = mouseG.append("path") // this is the black vertical line to follow mouse
+      .attr("class", "mouse-line-x")
+      .style("stroke", "black")
+      .style("stroke-width", ".8px")
+      .style("opacity", "1");
+
+    var mouseY = mouseG.append("path") // this is the black vertical line to follow mouse
+      .attr("class", "mouse-line-y")
+      .style("stroke", "black")
+      .style("stroke-width", ".8px")
+      .style("opacity", "1");
+
+    var circle = svg.append('g')
+      .append('circle')
+      .style("fill", "rgb(137, 41, 154)")
+      .attr("stroke", "black")
+      .attr('r', 6)
+      .style("opacity", 0)
+
+    var bisect = d3.bisector(function (d, x) { return d.Date - x; }).left;
+
+    // Set the zoom and Pan features: how much you can zoom, on which part, and what to do when there is a zoom
+    var zoom = d3.zoom()
+      .scaleExtent([.5, 20])  // This control how much you can unzoom (x0.5) and zoom (x20)
+      .extent([[0, 0], [width, height]])
+      .on("zoom", null);
+
+    function updateChart() {
+
+      var newX = d3.event.transform.rescaleX(xScale);
+      var newY = d3.event.transform.rescaleY(yScale);
+      xAxis.call(d3.axisBottom(newX))
+      yAxis.call(d3.axisLeft(newY))
+
+      xScale = newX;
+      yScale = newY;
+
+      d3.select('.lineStyle').remove();
+      d3.select('.arcClass').remove();
+
+      svg.append("path")
+        .datum(data)
+        .attr('class', 'arcClass')
+        .attr("fill", "#cce5df")
+        .attr("stroke", "#69b3a2")
+        .attr("stroke-width", 1)
+        .attr("fill-opacity", .3)
+        .attr("d", areaFunction)
+
+      lineGraph = svg.append('path')
+        .attr("d", lineFunction(data))
+        .attr("class", "lineStyle");
+    }
+
+    var tooltip = svg.append("text")
+      .text("tooltip text")
+      .attr("class", "tooltip")
+      .style("stroke", "Black")
+      .style("stroke-width", "1px")
+      .style("opacity", 0);
+
+
+    var view = mouseG.append('rect') // append a rect to catch mouse movements on canvas
+      .attr('width', svgWidth) // can't catch mouse events on a g element
+      .attr('height', svgHeight)
+      .attr('fill', 'none')
+      .attr('pointer-events', 'all')
+      .call(zoom)
+      .on('mouseout', function () { // on mouse out hide line, circles and text
+        mouseX.style("opacity", "0");
+        mouseY.style("opacity", "0");
+        circle.style("opacity", "0");
+        tooltip.style("opacity", "0");
+      })
+      .on('mouseover', function () { // on mouse in show line, circles and text
+        mouseX.style("opacity", "1");
+        mouseY.style("opacity", "1");
+        circle.style("opacity", "1");
+        tooltip.style("opacity", "1");
+      })
+      .on('mousemove', function () { // mouse moving over canvas
+
+        var mouse = d3.mouse(this);
+        var x0 = xScale.invert(d3.mouse(this)[0]);
+        var i = bisect(data, x0, 1);
+        selectedData = data[i];
+
+        circle.attr("cx", xScale(selectedData.Date))
+          .attr("cy", yScale(selectedData.Price));
+
+        mouseX.attr("d", function () {
+          var d = "M" + mouse[0] + "," + 0;
+          d += " " + mouse[0] + "," + height;
+          return d;
+        });
+
+        mouseY.attr("d", function () {
+          var d = "M" + 0 + "," + yScale(selectedData.Price);
+          d += " " + width + "," + yScale(selectedData.Price);
+          return d;
+        });
+
+        var dateString = selectedData.Date.getDate() + '/' + selectedData.Date.getMonth()
+          + '/' + selectedData.Date.getFullYear();
+
+        tooltip.html("1 USD-INR : " + selectedData.Price + ' ON ' + dateString)
+          .attr("transform", 
+          "translate(" + (xScale(selectedData.Date) + 10) + "," +
+              (yScale(selectedData.Price) + 20) + ")");
+      });
+  })
+</script>

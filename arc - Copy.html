@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .lineStyle {
+    stroke: rgb(245, 118, 86);
+    stroke-width: 1.5;
+    fill: none;
+  }
+</style>
+
+<body>
+  <h3 id="axis-val"></h3>
+</body>
+<!-- Load d3.js -->
+<!-- <script src="js/d3.v4.js"></script> -->
+<script src="https://d3js.org/d3.v4.min.js"></script>
+
+
+<script>
+
+  // set the dimensions and margins of the graph
+  var margin = { top: 10, right: 30, bottom: 30, left: 50 },
+    width = 1000 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+  var timeParse = d3.timeParse("%d-%b-%y");
+
+  // append the svg object to the body of the page
+  var svg = d3.select("body")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  //Read the data
+  d3.csv("http://192.168.200.73:4200/usd-inr.csv", function (data) {
+
+    data.forEach(d => {
+      d.Date = timeParse(d.Date);
+      d.Price = parseFloat(d.Price);
+    });
+
+    // Add X axis --> it is a date format
+    var xScale = d3.scaleTime()
+      .domain(d3.extent(data, function (d) { return d.Date; }))
+      .range([0, width]);
+
+    var xAxis = d3.axisBottom()
+      .scale(xScale)
+      .tickFormat(d3.timeFormat("%Y Yr"))
+      .ticks(10);
+
+    svg.append("g")
+      .attr("transform", "translate(0, " + height + ")")
+      .call(xAxis);
+
+    // Add Y axis
+    var yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.Price)])
+      .range([height, 0]);
+    svg.append("g").call(d3.axisLeft(yScale));
+
+    var yAxis = d3.axisLeft().scale(yScale);
+    svg.append("g").call(yAxis);
+
+    // Add the area
+    svg.append("path")
+      .datum(data)
+      .attr("fill", "#cce5df")
+      .attr("stroke", "#69b3a2")
+      .attr("stroke-width", 1)
+      .attr("fill-opacity", .3)
+      .attr("d", d3.area()
+        .x(d => xScale(d.Date))
+        .y0(yScale(0))
+        .y1(d => yScale(d.Price))
+      )
+
+    var lineFunction = d3.line()
+      .x(d => xScale(d.Date))
+      .y(d => yScale(d.Price));
+
+    //The line SVG Path we draw
+    var lineGraph = svg.append("path")
+      .attr("d", lineFunction(data))
+      .attr("class", "lineStyle");
+
+
+
+    /* Handling mouse events on SVG */
+    var mouseG = svg.append("g").attr("class", "mouse-over-effects");
+
+    mouseG.append("path") // this is the black vertical line to follow mouse
+      .attr("class", "mouse-line-x")
+      .style("stroke", "black")
+      .style("stroke-width", ".5px")
+      .style("opacity", "1");
+
+    mouseG.append("path") // this is the black vertical line to follow mouse
+      .attr("class", "mouse-line-y")
+      .style("stroke", "black")
+      .style("stroke-width", ".5px")
+      .style("opacity", "1");
+
+
+
+    var lines = document.getElementsByClassName('line');
+
+    var mousePerLine = mouseG.selectAll('.mouse-per-line')
+      .data(data)
+      .enter()
+      .append("g")
+      .attr("class", "mouse-per-line");
+
+    mousePerLine.append("circle")
+      .attr("r", 7)
+      .style("stroke", "red")
+      .style("fill", "none")
+      .style("stroke-width", "1px")
+      .style("opacity", "0");
+
+    mousePerLine.append("text")
+      .attr("transform", "translate(10,3)");
+
+
+    mouseG.append('svg:rect') // append a rect to catch mouse movements on canvas
+      .attr('width', width) // can't catch mouse events on a g element
+      .attr('height', height)
+      .attr('fill', 'none')
+      .attr('pointer-events', 'all')
+      .on('mouseout', function () { // on mouse out hide line, circles and text
+        d3.select(".mouse-line-x")
+          .style("opacity", "0");
+        d3.select(".mouse-line-y")
+          .style("opacity", "0");
+
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "0");
+        d3.selectAll(".mouse-per-line text")
+          .style("opacity", "0");
+      })
+      .on('mouseover', function () { // on mouse in show line, circles and text
+        d3.select(".mouse-line-x")
+          .style("opacity", "1");
+        d3.select(".mouse-line-y")
+          .style("opacity", "1");
+
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "1");
+        d3.selectAll(".mouse-per-line text")
+          .style("opacity", "1");
+      })
+      .on('mousemove', function () { // mouse moving over canvas
+
+        var mouse = d3.mouse(this);
+
+        d3.select(".mouse-line-x")
+          .attr("d", function () {
+            var d = "M" + mouse[0] + "," + height;
+            d += " " + mouse[0] + "," + 0;
+            return d;
+          });
+
+        d3.select(".mouse-line-y")
+          .attr("d", function () {
+            var d = "M" + 0 + "," + mouse[1];
+            d += " " + width + "," + mouse[1];
+            return d;
+          });
+        d3.select('#axis-val').html('x : y => ' + mouse[0] + " : " + mouse[1])
+
+
+        d3.selectAll(".mouse-per-line")
+          .attr("transform", function (d, i) {
+            console.log(width / mouse[0])
+
+            var beginning = 0,
+              end = lines[i].getTotalLength(),
+              target = null;
+
+            while (true) {
+              target = Math.floor((beginning + end) / 2);
+              pos = lines[i].getPointAtLength(target);
+              if ((target === end || target === beginning) && pos.x !== mouse[0]) {
+                break;
+              }
+              if (pos.x > mouse[0]) end = target;
+              else if (pos.x < mouse[0]) beginning = target;
+              else break; //position found
+            }
+            d3.select(this).select('text')
+              .text(yScale.invert(pos.y).toFixed(2));
+            return "translate(" + mouse[0] + "," + pos.y + ")";
+          });
+      });
+  })
+</script>

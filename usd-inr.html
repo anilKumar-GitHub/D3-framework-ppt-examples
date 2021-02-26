@@ -1,0 +1,109 @@
+<html>
+  <head>
+    <style>
+      .bar {
+        fill: steelblue;
+      }
+
+      .highlight {
+        fill: orange;
+      }
+
+      .line {
+        stroke: blue;
+        stroke-width: 2;
+        fill: none;
+      }
+    </style>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+  </head>
+
+  <body>
+    <h3 id="range"></h3>
+  </body>
+</html>
+
+<script>
+  var width = 800,
+    height = 400;
+  var margin = { left: 50, top: 50, right: 50, bottom: 50 };
+  var svgWidth = width + margin.left + margin.right;
+  var svgHeight = height + margin.top + margin.bottom;
+
+  d3.csv("http://172.20.10.5:4200/usd-inr.csv", function(data) {
+    var svg = d3
+      .select("body")
+      .append("svg")
+      .attr("width", svgWidth)
+      .attr("height", svgHeight)
+      .style("background-color", "#f3f3f3")
+      .style("border", "1px solid gray")
+      .style("margin-left", "200px")
+      .append("g")
+      .attr("transform", "translate(" + margin.left + ", " + margin.top + ")");
+
+    // parsing string type value Date foramte
+    var timeParse = d3.timeParse("%d-%b-%y");
+    data.forEach(d => {
+      d.Date = timeParse(d.Date);
+      d.Price = parseFloat(d.Price);
+    });
+
+    d3.select("#range").html(
+      "From : " +d3.min(data, d => d.Date) + "<br/>To : " + d3.max(data, d => d.Date)
+    );
+
+    var padding = 100;
+    var xScale = d3.scaleTime()
+      .domain(d3.extent(data, d => d.Date))
+      .range([0, width]);
+
+    var xAxis = d3.axisBottom()
+      .scale(xScale)
+      .tickFormat(d3.timeFormat("%Y"))
+      .ticks(20);
+
+    svg.append("g")
+      .attr("transform", "translate(0, " + height + ")")
+      .call(xAxis);
+
+    var yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => +d.Price)])
+      .range([height, 0]);
+
+    var yAxis = d3.axisLeft().scale(yScale);
+    svg.append("g").call(yAxis);
+
+    var lineFunction = d3.line()
+      .x(d => xScale(d.Date))
+      .y(d => yScale(d.Price));
+
+    //The line SVG Path we draw
+    var lineGraph = svg.append("path")
+      .attr("d", lineFunction(data))
+      .attr("class", "line");
+
+    var yArcScale = d3.scaleLinear()
+      .domain([0, d3.max(data, function(d) { return +d.Price; })])
+      .range([ height, 0 ]);
+
+    var arcFunction = d3.area()
+        .x(d => xScale(d.Date))
+        .y0(y(0))
+        .y1(d => yScale(d.Price));
+
+    svg.append("path")
+      .data(data)
+      .attr("fill", "#69b3a2")
+      .attr("fill-opacity", .3)
+      .attr("stroke", "2")
+      .attr("d", arcFunction);
+
+    d3.select("body")
+      .selectAll("p")
+      .data(data)
+      .enter()
+      .append("p")
+      .text((d, i) =>  i + " : " + JSON.stringify(d));
+  });
+</script>
